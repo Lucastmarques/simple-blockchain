@@ -58,9 +58,22 @@ class Blockchain(object):
         }
  
         tx['signature'] = Blockchain.sign(privWifKey, json.dumps(tx, sort_keys=True))
+        return tx
+    
+    def addTransaction(self, tx):
         self.memPool.append(tx)
-
-        return self.prevBlock['index'] + 1
+    
+    @staticmethod
+    def isValidTransaction(tx):
+        signature = tx['signature']
+        message = tx.copy()
+        message.pop('signature')
+        message = json.dumps(message)
+        try:
+            Blockchain.verifySignature(tx['sender'], signature, message)
+            return True, ""
+        except Exception as e:
+            return False, e
 
     def isValidChain(self, chain):
         # Dado uma chain passada como parâmetro, faz toda a verificação se o blockchain é válido:
@@ -123,13 +136,19 @@ class Blockchain(object):
 
     def printChain(self):
         # Imprime no console um formato verboso do blockchain.
-        print(json.dumps(self.chain, indent=2, sort_keys=True))
+        # print(json.dumps(self.chain, indent=2, sort_keys=True))
+        print(self.memPool)
         pass # Mantenha seu metodo de impressao do blockchain feito na pratica passada.
 
     @property
     def prevBlock(self):
         # Retorna o último bloco incluído no blockchain.
         return self.chain[-1]
+    
+    def registerNodes(self, nodes):
+        for node in nodes:
+            self.nodes.add(node)
+        
 
     @staticmethod
     def getWifCompressedPrivateKey(private_key=None):
