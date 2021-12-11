@@ -3,6 +3,7 @@ import json
 from time import time
 import copy
 import random
+import requests
 import bitcoinlib # pip install bitcoin
 
 DIFFICULTY = 4 # Quantidade de zeros (em hex) iniciais no hash valido.
@@ -65,6 +66,8 @@ class Blockchain(object):
     
     @staticmethod
     def isValidTransaction(tx):
+        if not 'signature' in [*tx.keys()]:
+            return False, "Missing Signature"
         signature = tx['signature']
         message = tx.copy()
         message.pop('signature')
@@ -77,15 +80,69 @@ class Blockchain(object):
 
     def isValidChain(self, chain):
         # Dado uma chain passada como parâmetro, faz toda a verificação se o blockchain é válido:
-        # 1. PoW válido
-        # 2. Transações assinadas e válidas
-        # 3. Merkle Root válido
-        pass
+        for block in chain:
+            # 1. PoW válido
+            pow_result, pow_reason =  self.checkPow(block)
+            if not pow_result:
+                return False, pow_reason
+            
+            # 2. Transações assinadas e válidas
+            tx_result, tx_reason = self.checkTransactions(block)
+            if not tx_result:
+                return False, tx_reason
+            
+            # 3. Verifica Merkle Root válido
+            mr_result, mr_reason = self.checkMerkleRoot(block)
+            if not mr_result:
+                return False, mr_reason
+        return True, ""
+            
+    def checkPow(self, block):
+        guessHash = Blockchain.getBlockID(block)
+        hash_result = guessHash[:DIFFICULTY] == '0' * DIFFICULTY
+        if hash_result:
+            return True, ""
+        else:
+            return False, "Invalid POW"
+                
+    def checkMerkleRoot(self, block):
+        merkleRoot = Blockchain.generateMerkleRoot(block['transactions'])
+        if block['merkleRoot'] != merkleRoot:
+            return False, "Invalid merkleRoot"
+        else:
+            return True, ""
+        
+    def checkTransactions(self, block):
+        for tx in block['transactions']:
+            result, _ = self.isValidTransaction(tx)
+            if not result:
+                return False, "Invalid Transaction <{}>".format(tx)
+        return True, ""
+                
 
     def resolveConflicts(self):
         # Consulta todos os nós registrados, e verifica se algum outro nó tem um blockchain com mais PoW e válido. Em caso positivo,
         # substitui seu próprio chain.
-        pass
+        valid_chains = []
+        for node in self.nodes:
+            url = 'http://' + node + '/chain'
+            chain = requests.get(url).json()
+            print(chain)
+            chain_result, _ = self.isValidChain(chain)
+            if chain_result:
+                valid_chains.append(chain)
+                
+        biggest = Blockchain.getBiggestChain(valid_chains)
+        if len(biggest) > len(self.chain):
+            self.chain = biggest
+                
+    @staticmethod  
+    def getBiggestChain(chain_list):
+        biggest = chain_list[0]
+        for index in range(1, len(chain_list)):
+            if len(chain_list[index]) > len(biggest):
+                biggest = chain_list[index]
+        return biggest
 
     @staticmethod
     def generateMerkleRoot(transactions):

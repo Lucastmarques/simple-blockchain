@@ -38,12 +38,14 @@ def get_mempool():
 
 @app.route('/mine', methods=['GET'])
 def mine():
-    prevBlock = blockchain.createBlock(0, blockchain.prevBlock)
+    prevBlockHash = Blockchain.getBlockID(blockchain.prevBlock)
+    prevBlock = blockchain.createBlock(0, prevBlockHash)
     blockchain.mineProofOfWork(prevBlock)
+    return "", 204
 
 @app.route('/chain', methods=['GET'])
 def get_chain():
-    pass
+    return jsonify(blockchain.chain), 200
 
 @app.route('/nodes/register', methods=['POST'])
 def register_node():
@@ -52,10 +54,11 @@ def register_node():
     blockchain.registerNodes(nodes)
     return "", 200
 
-@app.route('/nodes/resolve', methods=['POST'])
+@app.route('/nodes/resolve', methods=['GET'])
 def resolve_nodes():
-    pass
+    blockchain.resolveConflicts()
+    return "", 204
     
 
 if __name__ == "__main__":
-    app.run(port=5001)
+    app.run(port=5002)
