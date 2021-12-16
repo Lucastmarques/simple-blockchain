@@ -62,7 +62,8 @@ class Blockchain(object):
         return tx
     
     def addTransaction(self, tx):
-        self.memPool.append(tx)
+        if (not tx in self.memPool):
+            self.memPool.append(tx)
     
     @staticmethod
     def isValidTransaction(tx):
